@@ -1,0 +1,239 @@
+<html>
+<head>
+  <title>
+    random generator
+  </title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+    }
+
+    #container {
+      flex-wrap: wrap;
+      align-content: flex-start;
+      display: flex;
+    }
+
+    .container {
+      margin: 8px;
+      display: flex;
+      flex-direction: column;
+      flex-wrap: wrap;
+    }
+
+    .title {
+      font-size: large;
+      margin: 0;
+      word-wrap: break-word;
+    }
+
+    canvas {
+      border: 1px solid grey;
+      flex-grow: 0;
+      flex-shrink: 0;
+    }
+  </style>
+  <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+  <script>
+    function init() {
+      $('#width').val(localStorage['width']);
+      $('#height').val(localStorage['height']);
+    }
+    function deinit() {
+      localStorage['width'] = $('#width').val();
+      localStorage['height'] = $('#height').val();
+    }
+    function prestart() {
+      let w = $('#width').val() * 1;
+      let h = $('#height').val() * 1;
+      if (w > 0 && h > 0) {
+        localStorage['width'] = w;
+        localStorage['height'] = h;
+        start(w, h);
+      } else {
+        alert('please input positive integer')
+      }
+    }
+    function start(w, h) {
+      let body = $('#container');
+      body.html('');
+
+      function addGrid(name, w, h) {
+        let container = $(`<div class="container">`);
+//        container[0].style.width=w+'px';
+        let title = $(`<span class="title">${name}</span>`);
+        container.append(title);
+        let grid = $(`<canvas id="${name}">`);
+        container.append(grid);
+        grid.attr('width', w);
+        grid.attr('height', h);
+        grid[0].style.width = w + 'px';
+        grid[0].style.height = h + 'px';
+        let context = grid[0].getContext("2d");
+        (() => {
+          let xs = context.font.split('px');
+          if (xs.length == 2)
+            context.font = 20 + 'px' + xs[1];
+          else
+            context.font = '20px arial';
+        })();
+        context.fillText(
+          'loading...'
+          , Math.min(8 + 20, w / 2)
+          , Math.min(8 + 20, h / 2, 100)
+        );
+        context.globalAlpha = 1;
+        body.append(container);
+        return [
+          function setPixel(x, y, isBlack) {
+            context.fillStyle = isBlack ? '#000000' : '#ffffff';
+            context.fillRect(x, y, 1, 1);
+            return isBlack;
+          },
+          function setTitle(x) {
+            title.html(x);
+          }
+        ];
+      }
+
+      let afs = [];
+
+      /**
+       * avoid concurrent (frequent switch) (never?)
+       * */
+      function addAndRun(f) {
+        if (typeof f === 'function')
+          afs.push(f);
+        if (afs.length == 0)
+          return;
+        f = afs.shift();
+        setTimeout(() => {
+          f();
+          setTimeout(addAndRun);
+        })
+      }
+
+      function draw(f, name) {
+        if (!name) {
+          name = f.name;
+        }
+        let fs1 = addGrid(name, w / 2, h);
+        addAndRun(() => {
+          f(w / 2, h, ...fs1);
+        });
+        let fs2 = addGrid(name, w / 2 - 1, h);
+        addAndRun(() => {
+          f(w / 2, h, ...fs2);
+        });
+      }
+
+      fs.forEach(f => draw(f));
+//      fs.forEach(f => setTimeout(() => {
+//        draw(f)
+//      }));
+    }
+
+    let fs = [
+      function random(w, h, setPixel, setTitle) {
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            setPixel(x, y, Math.random() < 0.5)
+          }
+        }
+      },
+      function even(w, h, setPixel, setTitle) {
+        let i = 0;
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            setPixel(x, y, ++i % 2 == 0);
+          }
+        }
+      },
+      function random_gold_ratio(w, h, setPixel, setTitle) {
+        let phi = (1 + Math.sqrt(5)) / 2;
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            setPixel(x, y, Math.random() / phi > 0.5);
+          }
+        }
+      },
+      function fib(w, h, setPixel, setTitle) {
+        let ab = [1, 1];
+        let iab = [0, 0];
+        let mode = 0;
+        let ca = 0;
+        let cb = 0;
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            if (ab[0] == iab[0] && ab[1] == iab[1]) {
+              ab = [ab[1], ab[0] + ab[1]];
+              iab = [0, 0];
+            }
+            let pa = iab[0] / ab[0];
+            let pb = iab[1] / ab[1];
+            if (pa < pb) {
+              iab[0]++;
+              setPixel(x, y, true);
+              ca++;
+            } else {
+              iab[1]++;
+              setPixel(x, y, false);
+              cb++;
+            }
+          }
+        }
+        // setTitle(`fib<br>${ca}/${cb}`);
+      },
+      function prime(w, h, setPixel, setTitle) {
+        function nextFactor(n, x) {
+          if (n == x)
+            throw new Error('no next factor');
+          for (x++; n % x != 0; x++) ;
+          return x;
+        }
+
+        function nextPrime(n) {
+          for (n++; nextFactor(n, 1) != n; n++);
+          return n;
+        }
+
+        let i = 2;
+        let p = nextPrime(i);
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            i++;
+            if (i == p) {
+              p = nextPrime(i);
+              setPixel(x, y, true);
+            } else {
+              setPixel(x, y, false);
+            }
+          }
+        }
+      },
+    ];
+
+  </script>
+</head>
+<body onload="init()" onclose="deinit()">
+<table>
+  <tbody>
+  <tr>
+    <td>Width</td>
+    <td><input id="width"></td>
+  </tr>
+  <tr>
+    <td>Height</td>
+    <td><input id="height"></td>
+  </tr>
+  <tr>
+    <td>
+      <button onclick="prestart()">Start</button>
+    </td>
+  </tr>
+  </tbody>
+</table>
+<div id="container"></div>
+</body>
+</html>
