@@ -36,9 +36,11 @@
   </style>
   <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
   <script>
+    let report;
     function init() {
       $('#width').val(localStorage['width']);
       $('#height').val(localStorage['height']);
+      report = $('#report');
     }
     function deinit() {
       localStorage['width'] = $('#width').val();
@@ -85,13 +87,25 @@
         );
         context.globalAlpha = 1;
         body.append(container);
+//        let imageData = context.getImageData(0, 0, w, h);
+        let imageData = context.createImageData(w, h);
         return [
           function setPixel(x, y, isBlack) {
-            context.fillStyle = isBlack ? '#000000' : '#ffffff';
-            context.fillRect(x, y, 1, 1);
+//            context.fillStyle = isBlack ? '#000000' : '#ffffff';
+//            context.fillRect(x, y, 1, 1);
+//            return isBlack ? 1 : 0;
+            let offset = (x + y * w) * 4;
+            let color = isBlack ? 0 : 255;
+            imageData.data[offset + 0] = color;
+            imageData.data[offset + 1] = color;
+            imageData.data[offset + 2] = color;
+            imageData.data[offset + 3] = 255;
             return isBlack ? 1 : 0;
           }
           , extra
+          , function render() {
+            context.putImageData(imageData, 0, 0);
+          }
         ];
       }
 
@@ -107,7 +121,12 @@
           return;
         f = afs.shift();
         setTimeout(() => {
+//          try {
           f();
+//          } catch (e) {
+//            console.log(e);
+//            alert(e);
+//          }
           setTimeout(addAndRun);
         })
       }
@@ -117,19 +136,27 @@
           name = f.name;
         }
         let fs1 = addGrid(name, w / 2, h);
+        let oriF = f;
+        f = function () {
+          console.log('running : ' + oriF.name);
+          let start = new Date().getTime();
+          let res = oriF(...arguments);
+          let end = new Date().getTime();
+          console.log('used ' + (end - start) + 'ms');
+          return res;
+        };
         addAndRun(() => {
           f(w / 2, h, ...fs1);
+          fs1[2]();
         });
         let fs2 = addGrid(name, w / 2 - 1, h);
         addAndRun(() => {
           f(w / 2 - 1, h, ...fs2);
+          fs2[2]();
         });
       }
 
       fs.forEach(f => draw(f));
-//      fs.forEach(f => setTimeout(() => {
-//        draw(f)
-//      }));
     }
 
     let fs = [
@@ -209,18 +236,6 @@
         $(extra).text(c1 / (w * h) * 100 + '%');
       }
       , function prime(w, h, setPixel, extra) {
-        function nextFactor(n, x) {
-          if (n == x)
-            throw new Error('no next factor');
-          for (x++; n % x != 0; x++) ;
-          return x;
-        }
-
-        function nextPrime(n) {
-          for (n++; nextFactor(n, 1) != n; n++);
-          return n;
-        }
-
         let i = 2;
         let p = nextPrime(i);
         let c1 = 0;
@@ -239,18 +254,6 @@
         $(extra).text(c1 / i * 100 + '%');
       }
       , function prime_toggle(w, h, setPixel, extra) {
-        function nextFactor(n, x) {
-          if (n == x)
-            throw new Error('no next factor');
-          for (x++; n % x != 0; x++) ;
-          return x;
-        }
-
-        function nextPrime(n) {
-          for (n++; nextFactor(n, 1) != n; n++);
-          return n;
-        }
-
         let i = 2;
         let p = nextPrime(i);
         let count = 0;
@@ -266,18 +269,13 @@
               count++;
               density = count / i;
               p = nextPrime(i);
-//              setPixel(x, y, true);
-//              c1++;
-//              setPixel(x, y, false);
               last_con = con;
               con = 0;
-//              mode = 0;
               mode ^= 1;
             } else {
               con++;
               if (con < last_con)
                 mode ^= 1;
-//              c1 += setPixel(x, y, mode);
             }
             c1 += setPixel(x, y, mode);
           }
@@ -285,18 +283,6 @@
         $(extra).text(c1 / i * 100 + '%');
       }
       , function prime_toggle_2(w, h, setPixel, extra) {
-        function nextFactor(n, x) {
-          if (n == x)
-            throw new Error('no next factor');
-          for (x++; n % x != 0; x++) ;
-          return x;
-        }
-
-        function nextPrime(n) {
-          for (n++; nextFactor(n, 1) != n; n++);
-          return n;
-        }
-
         let i = 2;
         let p = nextPrime(i);
         let count = 0;
@@ -318,8 +304,119 @@
         }
         $(extra).text(c1 / i * 100 + '%');
       }
+      , function rule_30(w, h, setPixel, extra) {
+        let c1 = 0;
+
+        let rules = [];
+
+        function addRule(state, result) {
+          let a = state[2] == '1' ? 1 : 0;
+          let b = state[1] == '1' ? 1 : 0;
+          let c = state[0] == '1' ? 1 : 0;
+          rules[c + b * 2 + a * 4] = result;
+        }
+
+        addRule('111', 0);
+        addRule('110', 0);
+        addRule('101', 0);
+        addRule('100', 1);
+        addRule('011', 1);
+        addRule('010', 1);
+        addRule('001', 1);
+        addRule('000', 0);
+
+        let state = [1];
+        let new_state = [];
+        let i_state = 0;
+        let a, b, c;
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            if (i_state == state.length) {
+              /* next level */
+              i_state = 0;
+              a = 0;
+              b = 0;
+              c = 0;
+              for (let i = 0, n = state.length + 2; i < n; i++) {
+                a = b;
+                b = c;
+                c = state[i] ? 1 : 0;
+                new_state[i] = rules[c + b * 2 + a * 4];
+              }
+              state = new_state;
+            }
+            c1 += setPixel(x, y, state[i_state]);
+            i_state++;
+          }
+        }
+        $(extra).text(c1 / (w * h) * 100 + '%');
+      }
+      , function rule_30_time_shifted(w, h, setPixel, extra) {
+        let c1 = 0;
+
+        let rules = [];
+
+        function addRule(state, result) {
+          let a = state[2] == '1' ? 1 : 0;
+          let b = state[1] == '1' ? 1 : 0;
+          let c = state[0] == '1' ? 1 : 0;
+          rules[c + b * 2 + a * 4] = result;
+        }
+
+        addRule('111', 0);
+        addRule('110', 0);
+        addRule('101', 0);
+        addRule('100', 1);
+        addRule('011', 1);
+        addRule('010', 1);
+        addRule('001', 1);
+        addRule('000', 0);
+
+        let state = [1];
+        let new_state = [];
+        let i_state = 0;
+        let a, b, c;
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            if (i_state == state.length) {
+              /* next level */
+              i_state = 0;
+              a = 0;
+              b = 0;
+              c = 0;
+              for (let i = 0, n = state.length + 2; i < n; i++) {
+                a = b;
+                b = c;
+                c = state[i] ? 1 : 0;
+                new_state[i] = rules[c + b * 2 + a * 4];
+              }
+              state = new_state;
+            }
+            c1 += setPixel(x, y, state[(i_state + Date.now()) % state.length]);
+            i_state++;
+          }
+        }
+        $(extra).text(c1 / (w * h) * 100 + '%');
+      }
     ];
 
+    function nextFactor(n, x) {
+      if (n == x)
+        throw new Error('no next factor');
+      for (x++; n % x != 0; x++) ;
+      return x;
+    }
+
+    function nextPrime(n) {
+      if (nextPrime.cache && nextPrime.cache[n])
+        return nextPrime.cache[n];
+      let res = n;
+      for (res++; nextFactor(res, 1) != res; res++);
+      if (!nextPrime.cache)
+        nextPrime.cache = [];
+      nextPrime.cache[n] = res;
+      return res;
+    }
   </script>
 </head>
 <body onload="init()" onclose="deinit()">
@@ -340,6 +437,7 @@
   </tr>
   </tbody>
 </table>
+<div id="report"></div>
 <div id="container"></div>
 </body>
 </html>
