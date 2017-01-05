@@ -61,11 +61,11 @@
 
       function addGrid(name, w, h) {
         let container = $(`<div class="container">`);
-//        container[0].style.width=w+'px';
-        let title = $(`<span class="title">${name}</span>`);
-        container.append(title);
+        container.append(`<span class="title">${name}</span>`);
         let grid = $(`<canvas id="${name}">`);
         container.append(grid);
+        let extra = $('<div>');
+        container.append(extra);
         grid.attr('width', w);
         grid.attr('height', h);
         grid[0].style.width = w + 'px';
@@ -89,11 +89,9 @@
           function setPixel(x, y, isBlack) {
             context.fillStyle = isBlack ? '#000000' : '#ffffff';
             context.fillRect(x, y, 1, 1);
-            return isBlack;
-          },
-          function setTitle(x) {
-            title.html(x);
+            return isBlack ? 1 : 0;
           }
+          , extra
         ];
       }
 
@@ -135,34 +133,53 @@
     }
 
     let fs = [
-      function random(w, h, setPixel, setTitle) {
+      function random(w, h, setPixel, extra) {
         for (let y = 0; y < h; y++) {
           for (let x = 0; x < w; x++) {
             setPixel(x, y, Math.random() < 0.5)
           }
         }
-      },
-      function even(w, h, setPixel, setTitle) {
+      }
+      , function even(w, h, setPixel, extra) {
         let i = 0;
         for (let y = 0; y < h; y++) {
           for (let x = 0; x < w; x++) {
             setPixel(x, y, ++i % 2 == 0);
           }
         }
-      },
-      function random_gold_ratio(w, h, setPixel, setTitle) {
+      }
+      , function random_gold_ratio(w, h, setPixel, extra) {
         let phi = (1 + Math.sqrt(5)) / 2;
         for (let y = 0; y < h; y++) {
           for (let x = 0; x < w; x++) {
             setPixel(x, y, Math.random() / phi > 0.5);
           }
         }
-      },
-      function fib(w, h, setPixel, setTitle) {
+      }
+      , function fib(w, h, setPixel, extra) {
+        let a = 1;
+        let b = 1;
+        let c = 2;
+        let i = 0;
+        let c1 = 0;
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            if (i == c) {
+              a = b;
+              b = c;
+              c = a + b;
+              i = 0;
+            }
+            if (setPixel(x, y, i++ < a))
+              c1++;
+          }
+        }
+        $(extra).text(c1 / (w * h) * 100 + '%');
+      }
+      , function fib_2(w, h, setPixel, extra) {
         let ab = [1, 1];
         let iab = [0, 0];
-        let ca = 0;
-        let cb = 0;
+        let c1 = 0;
         for (let y = 0; y < h; y++) {
           for (let x = 0; x < w; x++) {
             if (ab[0] == iab[0] && ab[1] == iab[1]) {
@@ -174,17 +191,16 @@
             if (pa < pb) {
               iab[0]++;
               setPixel(x, y, true);
-              ca++;
+              c1++;
             } else {
               iab[1]++;
               setPixel(x, y, false);
-              cb++;
             }
           }
         }
-        // setTitle(`fib<br>${ca}/${cb}`);
-      },
-      function prime(w, h, setPixel, setTitle) {
+        $(extra).text(c1 / (w * h) * 100 + '%');
+      }
+      , function prime(w, h, setPixel, extra) {
         function nextFactor(n, x) {
           if (n == x)
             throw new Error('no next factor');
@@ -199,18 +215,101 @@
 
         let i = 2;
         let p = nextPrime(i);
+        let c1 = 0;
         for (let y = 0; y < h; y++) {
           for (let x = 0; x < w; x++) {
             i++;
             if (i == p) {
               p = nextPrime(i);
               setPixel(x, y, true);
+              c1++;
             } else {
               setPixel(x, y, false);
             }
           }
         }
-      },
+        $(extra).text(c1 / i * 100 + '%');
+      }
+      , function prime_toggle(w, h, setPixel, extra) {
+        function nextFactor(n, x) {
+          if (n == x)
+            throw new Error('no next factor');
+          for (x++; n % x != 0; x++) ;
+          return x;
+        }
+
+        function nextPrime(n) {
+          for (n++; nextFactor(n, 1) != n; n++);
+          return n;
+        }
+
+        let i = 2;
+        let p = nextPrime(i);
+        let count = 0;
+        let density = 1;
+        let last_con = 1;
+        let con = 0;
+        let mode = 0;
+        let c1 = 0;
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            i++;
+            if (i == p) {
+              count++;
+              density = count / i;
+              p = nextPrime(i);
+//              setPixel(x, y, true);
+//              c1++;
+//              setPixel(x, y, false);
+              last_con = con;
+              con = 0;
+//              mode = 0;
+              mode ^= 1;
+            } else {
+              con++;
+              if (con < last_con)
+                mode ^= 1;
+//              c1 += setPixel(x, y, mode);
+            }
+            c1 += setPixel(x, y, mode);
+          }
+        }
+        $(extra).text(c1 / i * 100 + '%');
+      }
+      , function prime_toggle_2(w, h, setPixel, extra) {
+        function nextFactor(n, x) {
+          if (n == x)
+            throw new Error('no next factor');
+          for (x++; n % x != 0; x++) ;
+          return x;
+        }
+
+        function nextPrime(n) {
+          for (n++; nextFactor(n, 1) != n; n++);
+          return n;
+        }
+
+        let i = 2;
+        let p = nextPrime(i);
+        let count = 0;
+        let density = 1;
+        let mode = 0;
+        let c1 = 0;
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            i++;
+            if (i == p) {
+              count++;
+              density = count / i;
+              p = nextPrime(i);
+            } else {
+              mode ^= 1;
+            }
+            c1 += setPixel(x, y, mode);
+          }
+        }
+        $(extra).text(c1 / i * 100 + '%');
+      }
     ];
 
   </script>
