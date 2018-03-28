@@ -1,0 +1,16 @@
+= random-generator
+
+Demo:https://random-generator.surge.sh/
+
+== Random Algorithms
+
+. Javascript Random
+. Even
+. Random Gold Ratio
+. Fib
+. Fib2
+. Prime
+. Prime Toggle
+. Prime Toggle 2
+. Rule 30
+. RUle 30 time shifted
